@@ -1,0 +1,187 @@
+<html>
+<head>
+    <title>MNIST Digits Recognition</title>
+    <style>
+        #imgView {
+            border: 1px solid #FFFFFF;
+        }
+
+        #btnClear {
+            background: gray;
+            width: 280px;
+            color: white;
+            font-size: 2em;
+        }
+
+        #btnSend {
+            background: gray;
+            width: 280px;
+            color: white;
+            font-size: 2em;
+        }
+    </style>
+</head>
+
+<body>
+<canvas id="imgView" width="280" height="280">
+    Unfortunately, your browser does not supported.
+</canvas>
+
+<p>
+    <button id="btnClear">Clear</button>
+</p>
+<p>
+    <button id="btnSend">Send</button>
+</p>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script>
+    window.addEventListener('load', function () {
+        var canvas, context;
+        var iw = 28; // image width
+        var ih = 28; // image height
+        var s = 10;  // scale (in HTML the canvas size is 280px, mapping canvas size to MINST sample size 28x28)
+        var dimg;    // digit pixels in 2D array
+
+        function init() {
+            canvas = document.getElementById('imgView');
+            context = canvas.getContext('2d');
+            drawtool = new CanvasPencil();
+
+            canvas.addEventListener('mousedown', drawtool.mousedown, false);
+            canvas.addEventListener('mousemove', drawtool.mousemove, false);
+            canvas.addEventListener('mouseup', drawtool.mouseup, false);
+            canvas.addEventListener('mouseleave', drawtool.mouseup, false);
+
+            var btnClear = document.getElementById("btnClear");
+            btnClear.addEventListener("click", clearCanvas, false);
+
+            var btnSend = document.getElementById("btnSend");
+            btnSend.addEventListener("click", callWebService, false);
+
+            drawCanvasGrid();
+
+            dimg = new Array(ih);
+            for (var i = 0; i < ih; i++) {
+                dimg[i] = new Array(iw);
+            }
+
+            clearCanvas();
+        }
+
+        function CanvasPencil() {
+            var isMouseDown = false;
+            var mouseX = 0;
+            var mouseY = 0;
+
+            this.mousedown = function (evt) {
+                isMouseDown = true;
+
+                mouseX = evt.offsetX;
+                mouseY = evt.offsetY;
+
+                context.beginPath();
+                context.moveTo(mouseX, mouseY);
+            };
+
+            this.mousemove = function (evt) {
+                if (isMouseDown) {
+                    mouseX = evt.offsetX;
+                    mouseY = evt.offsetY;
+
+                    dx = Math.floor(mouseX / 10);
+                    dy = Math.floor(mouseY / 10);
+
+                    drawCanvasCell(dx, dy); // draw pixel on the canvas
+
+                    dimg[dx][dy] = 1;  // set the same pixel on 2D array
+
+
+                    // not a thin line, but a bold line, like the original digit drawings...
+                    if (dx < 27 && dy < 27 && dx > 0 && dy > 0) {
+                        drawCanvasCell(dx, dy + 1);
+                        drawCanvasCell(dx, dy - 1);
+                        drawCanvasCell(dx + 1, dy + 1);
+                        drawCanvasCell(dx + 1, dy);
+                        drawCanvasCell(dx + 1, dy - 1);
+                        drawCanvasCell(dx - 1, dy + 1);
+                        drawCanvasCell(dx - 1, dy);
+                        drawCanvasCell(dx - 1, dy - 1);
+
+                        // not a thin line, but a bold line, like the original digit drawings...
+                        dimg[dx][dy + 1] = 1;
+                        dimg[dx][dy - 1] = 1;
+                        dimg[dx + 1][dy + 1] = 1;
+                        dimg[dx + 1][dy] = 1;
+                        dimg[dx + 1][dy - 1] = 1;
+                        dimg[dx - 1][dy + 1] = 1;
+                        dimg[dx - 1][dy] = 1;
+                        dimg[dx - 1][dy - 1] = 1;
+                    }
+                }
+            };
+
+            this.mouseup = function (evt) {
+                isMouseDown = false;
+            };
+        }
+
+        function clearCanvas() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            drawCanvasGrid();
+            for (var i = 0; i < ih; i++) {
+                for (var j = 0; j < iw; j++) {
+                    dimg[i][j] = 0;
+                }
+            }
+
+
+        }
+
+        function drawCanvasCell(x, y) {
+            context.fillRect(x * s, y * s, s, s);
+        }
+
+        function drawCanvasGrid() {
+            for (var x = 0; x <= iw; x += 1) {
+                context.moveTo(x * s, 0);
+                context.lineTo(x * s, ih * s);
+            }
+
+            for (var y = 0; y <= ih; y += 1) {
+                context.moveTo(0, y * s);
+                context.lineTo(iw * s, y * s);
+            }
+
+            context.stroke();
+        }
+
+        function callWebService() {
+            let dataObj = {'pixels': dimg};
+            jQuery.ajax({
+                url: "/",
+                beforeSend: function (xhrObj) {
+                    xhrObj.setRequestHeader("Content-Type", "application/json;charset=utf-8");
+                },
+                type: "POST",
+                data: JSON.stringify(dataObj)
+            })
+                .done(function (data) {
+                    let message = `Predicted: ${data.predicted}\nProbabilities:\n`;
+                    $.each(data.probs, function (index, value) {
+                        message += `${value[0]}: ${value[1]}\n`
+                    });
+
+                    alert(message);
+                })
+                .fail(function () {
+                    alert("error");
+                });
+        }
+
+        init();
+    }, false);
+</script>
+
+</body>
+</html>
